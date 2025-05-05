@@ -205,16 +205,16 @@ constraints.to_GhAb(lbub_to_G=True)
 # Run a mean-variance optimization
 # --------------------------------------------------------------------------
 
-# solver_name = 'cvxopt'
-solver_name = 'gurobi'
+solver_name = 'cvxopt'
+# solver_name = 'gurobi'
 
 
 mv = MeanVariance(
     covariance=covariance,
-     mean_estimator=mean_estimator,
-     constraints=constraints,
-     solver_name=solver_name,
-     risk_aversion=1,
+    mean_estimator=mean_estimator,
+    constraints=constraints,
+    solver_name=solver_name,
+    risk_aversion=1,
 )
 mv.set_objective(optimization_data=data)
 mv.solve()
@@ -223,7 +223,8 @@ mv.solve()
 
 # Extract the optimal weights and covariance matrix
 w_star = pd.Series(mv.results['weights'])
-covmat = mv.objective['P'] / 2
+covmat = mv.objective['P'].copy() / 2
+mu = pd.Series(mv.objective['q'], constraints.selection) * (-1)
 
 
 
@@ -241,22 +242,47 @@ mu_implied = infer_mean_vector_gurobi(
 mu_implied
 
 
+
+# Analytical solution
+mu_implied_analytic = pd.Series(covmat @ w_star, constraints.selection)
+
+
+
+# Compare the estimated mean with the implied mean
+Mu = pd.DataFrame(
+    [mu, mu_implied, mu_implied_analytic],
+    index=["mu", "mu_implied", "mu_implied_analytic"]
+).T
+Mu.plot(kind="bar", figsize=(10, 5))
+
+
+
+
 # Assert that mean-variance optimization with mu_implied gives the same result
+
+# Analytical solution
+w_star_analytic = pd.Series(
+    np.linalg.inv(covmat) @ mu_implied_analytic,
+    index=constraints.selection
+)
+
+
+# Using the solver
 mv2 = MeanVariance(
     constraints=constraints,
-    # solver_name="gurobi",
-    solver_name="cvxopt",
+    solver_name=solver_name,
 )
 mv2.objective = Objective(
     q=pd.Series(mu_implied, constraints.selection) * (-1),
-    P=mv.objective['P'],
+    # q=mu_implied_analytic * (-1),
+    P=covmat * 2,
 )
 mv2.solve()
 w_star_2 = pd.Series(mv2.results["weights"])
 
-
-W = pd.DataFrame([w_star, w_star_2], index=["w_star", "w_star_2"]).T
+W = pd.DataFrame([w_star, w_star_2, w_star_analytic], index=["w_star", "w_star_2", "w_start_analytic"]).T
 W.plot(kind="bar", figsize=(10, 5))
+
 
 
 
