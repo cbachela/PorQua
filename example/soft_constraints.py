@@ -1,4 +1,12 @@
+############################################################################
+### SOFT CONSTRAINTS
+############################################################################
 
+# --------------------------------------------------------------------------
+# Cyril Bachelard
+# This version:     05.05.2025
+# First version:    05.05.2025
+# --------------------------------------------------------------------------
 
 
 
@@ -31,9 +39,6 @@ from builders import (
     bibfn_return_series,
     bibfn_budget_constraint,
     bibfn_box_constraints,
-)
-from data_loader import (
-    load_data_msci,
 )
 
 
@@ -91,7 +96,7 @@ def bibfn_group_constraints(bs: 'BacktestService', rebdate: str, **kwargs) -> No
         rhs = rhs,
         sense = sense,
         name = name,
-#        soft = soft,
+        # soft = soft,
     )
     return None
 
@@ -126,18 +131,26 @@ def solve_gurobi(optimization) -> bool:
 
 def model_gurobi(optimization) -> None:
 
-    P = optimization.objective['P'].to_numpy() if hasattr(optimization.objective['P'], "to_numpy") else optimization.objective['P']
-    q = optimization.objective['q'].to_numpy() if hasattr(optimization.objective['q'], "to_numpy") else optimization.objective['q']
+    P = (
+        optimization.objective['P'].to_numpy()
+        if hasattr(optimization.objective['P'], "to_numpy")
+        else optimization.objective['P']
+    )
+    q = (
+        optimization.objective['q'].to_numpy()
+        if hasattr(optimization.objective['q'], "to_numpy")
+        else optimization.objective['q']
+    )
     GhAb = optimization.constraints.to_GhAb()
     N = len(optimization.constraints.selection)
     transaction_cost = optimization.params.get('transaction_cost')
 
-    ###
+    # Initialize Gurobi model
     optimization.model = Model('portfolio')
     optimization.model.Params.LogToConsole = 0
-    ###
 
-    # Prepare decision variable 'x' as matrix variable including lower and upper bounds and variable type
+    # Prepare decision variable 'x' as matrix variable including
+    # lower and upper bounds and variable type
     lb = optimization.constraints.box['lower'].to_numpy()
     ub = optimization.constraints.box['upper'].to_numpy()
     v_type = GRB.CONTINUOUS
@@ -265,7 +278,7 @@ optim = MeanVariance(
 
 
 
-                 
+      
 # --------------------------------------------------------------------------
 # Initialize the backtest service
 # --------------------------------------------------------------------------

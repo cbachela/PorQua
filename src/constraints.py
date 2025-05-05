@@ -14,7 +14,7 @@ Licensed under GNU LGPL.3, see LICENCE file
 import warnings
 import pandas as pd
 import numpy as np
-from typing import Dict
+from typing import Dict, Union
 
 
 
@@ -29,7 +29,7 @@ class Constraints:
         self.selection = selection
         self.budget = {'Amat': None, 'sense': None, 'rhs': None}
         self.box = {'box_type': 'NA', 'lower': None, 'upper': None}
-        self.linear = {'Amat': None, 'sense': None, 'rhs': None}
+        self.linear = {'Amat': None, 'sense': None, 'rhs': None, 'soft': None}
         self.l1 = {}
         return None
 
@@ -66,9 +66,10 @@ class Constraints:
     def add_linear(self,
                    Amat: pd.DataFrame = None,
                    a_values: pd.Series = None,
-                   sense: str = '=',
-                   rhs=None,
-                   name: str = None) -> None:
+                   sense: Union[str, pd.Series] = '=',
+                   rhs = None,
+                   name: str = None,
+                   soft: Union[bool, pd.Series] = [False]) -> None:
         if Amat is None:
             if a_values is None:
                 raise ValueError("Either 'Amat' or 'a_values' must be provided.")
@@ -78,19 +79,23 @@ class Constraints:
                     Amat.index = [name]
 
         if isinstance(sense, str):
-            sense = pd.Series([sense])
+            sense = pd.Series([sense], index=Amat.index)
 
         if isinstance(rhs, (int, float)):
-            rhs = pd.Series([rhs])
+            rhs = pd.Series([rhs], index=Amat.index)
+        
+        if isinstance(soft, bool):
+            soft = pd.Series([soft], index=Amat.index)
 
         if self.linear['Amat'] is not None:
             Amat = pd.concat([self.linear['Amat'], Amat], axis=0, ignore_index=False)
             sense = pd.concat([self.linear['sense'], sense], axis=0, ignore_index=False)
             rhs = pd.concat([self.linear['rhs'], rhs], axis=0, ignore_index=False)
-
+            soft = pd.concat([self.linear['soft'], soft], axis=0, ignore_index=False)
+            
         Amat.fillna(0, inplace=True)
 
-        self.linear = {'Amat': Amat, 'sense': sense, 'rhs': rhs}
+        self.linear = {'Amat': Amat, 'sense': sense, 'rhs': rhs, 'soft': soft}
         return None
 
     # name: turnover or leverage
