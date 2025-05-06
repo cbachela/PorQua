@@ -31,9 +31,6 @@ sys.path.append(project_root)
 sys.path.append(src_path)
 
 # Local application imports
-from backtest import (
-    BacktestService,
-)
 from optimization import MeanVariance, Objective
 from covariance import Covariance
 from mean_estimation import MeanEstimator
@@ -150,16 +147,10 @@ data['return_series'].head()
 
 
 # --------------------------------------------------------------------------
-# Estimate the covariance matrix
+# Initialize the estimators for covariance and expected return
 # --------------------------------------------------------------------------
 
 covariance = Covariance(method='pearson')
-
-
-# --------------------------------------------------------------------------
-# Initialize the mean estimator
-# --------------------------------------------------------------------------
-
 mean_estimator = MeanEstimator(method='geometric')
 
 
@@ -184,7 +175,7 @@ G = pd.DataFrame(
 )
 G.iloc[0, 0:5] = 1
 G.iloc[1, 6:10] = 1
-h = pd.Series([0.5, 0.5])
+h = pd.Series([0.5, 0.4])
 constraints.add_linear(
     Amat=G,
     sense='<=',
@@ -221,7 +212,7 @@ mv.solve()
 
 
 
-# Extract the optimal weights and covariance matrix
+# Extract the optimal weight, the covariance matrix, and the mean vector
 w_star = pd.Series(mv.results['weights'])
 covmat = mv.objective['P'].copy() / 2
 mu = pd.Series(mv.objective['q'], constraints.selection) * (-1)
@@ -248,7 +239,7 @@ mu_implied_analytic = pd.Series(covmat @ w_star, constraints.selection)
 
 
 
-# Compare the estimated mean with the implied mean
+# Compare the mean vectors
 Mu = pd.DataFrame(
     [mu, mu_implied, mu_implied_analytic],
     index=["mu", "mu_implied", "mu_implied_analytic"]
@@ -273,9 +264,9 @@ mv2 = MeanVariance(
     solver_name=solver_name,
 )
 mv2.objective = Objective(
-    q=pd.Series(mu_implied, constraints.selection) * (-1),
-    # q=mu_implied_analytic * (-1),
-    P=covmat * 2,
+    # q=pd.Series(mu_implied, constraints.selection) * (-1),
+    q=mu_implied_analytic * (-1),
+    P=covmat,
 )
 mv2.solve()
 w_star_2 = pd.Series(mv2.results["weights"])
