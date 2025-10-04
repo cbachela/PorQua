@@ -87,6 +87,9 @@ class Constraints:
         if isinstance(soft, bool):
             soft = pd.Series(soft, index=Amat.index)
 
+        # Enforce soft=False for equality constraints
+        soft = soft.where(sense != '=', False)
+
         if self.linear['Amat'] is not None:
             Amat = pd.concat([self.linear['Amat'], Amat], axis=0, ignore_index=False)
             sense = pd.concat([self.linear['sense'], sense], axis=0, ignore_index=False)
@@ -121,6 +124,8 @@ class Constraints:
         b = None
         G = None
         h = None
+        soft_indices = []  # Track which rows of G have soft constraints
+        normalization_factors = []  # Track normalization factors for reporting
 
         if self.budget['Amat'] is not None:
             if self.budget['sense'] == '=':
@@ -140,6 +145,7 @@ class Constraints:
         if self.linear['Amat'] is not None:
             Amat = self.linear['Amat'].copy()
             rhs = self.linear['rhs'].copy()
+            soft = self.linear['soft'].copy()
 
             # Ensure that the system of inequalities is all '<='
             idx_geq = np.array(self.linear['sense'] == '>=')
@@ -157,11 +163,27 @@ class Constraints:
                 if idx_eq.sum() < Amat.shape[0]:
                     G_tmp = Amat[idx_eq == False].to_numpy()
                     h_tmp = rhs[idx_eq == False].to_numpy()
+                    soft_tmp = soft[idx_eq == False].to_numpy()
             else:
                 G_tmp = Amat.to_numpy()
                 h_tmp = rhs.to_numpy()
+                soft_tmp = soft.to_numpy()
 
             if 'G_tmp' in locals():
+                # Normalize soft inequality constraints
+                start_idx = G.shape[0] if G is not None else 0
+                for i, is_soft in enumerate(soft_tmp):
+                    if is_soft:
+                        # Compute norm of constraint coefficients
+                        norm = np.linalg.norm(G_tmp[i])
+                        if norm > 1e-10:  # Avoid division by zero
+                            G_tmp[i] = G_tmp[i] / norm
+                            h_tmp[i] = h_tmp[i] / norm
+                            normalization_factors.append(norm)
+                        else:
+                            normalization_factors.append(1.0)
+                        soft_indices.append(start_idx + i)
+                    
                 G = np.vstack((G, G_tmp)) if G is not None else G_tmp
                 h = np.concatenate((h, h_tmp), axis=None) if h is not None else h_tmp
 
@@ -169,7 +191,7 @@ class Constraints:
         A = A.reshape(-1, A.shape[-1]) if A is not None else None
         G = G.reshape(-1, G.shape[-1]) if G is not None else None
 
-        return {'G': G, 'h': h, 'A': A, 'b': b}
+        return {'G': G, 'h': h, 'A': A, 'b': b, 'soft_indices': soft_indices, 'normalization_factors': normalization_factors}
 
 
 
